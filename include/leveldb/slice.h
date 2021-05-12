@@ -23,7 +23,7 @@
 #include "leveldb/export.h"
 
 namespace leveldb {
-
+//Slice 基本上封装了 std的string，数据部分用 const char* 字长用 int，不做内存管理
 class LEVELDB_EXPORT Slice {
  public:
   // Create an empty slice.
@@ -39,8 +39,8 @@ class LEVELDB_EXPORT Slice {
   Slice(const char* s) : data_(s), size_(strlen(s)) {}
 
   // Intentionally copyable.
-  Slice(const Slice&) = default;
-  Slice& operator=(const Slice&) = default;
+  Slice(const Slice&) = default;//默认的拷贝构造函数
+  Slice& operator=(const Slice&) = default;//默认的复制构造函数
 
   // Return a pointer to the beginning of the referenced data
   const char* data() const { return data_; }

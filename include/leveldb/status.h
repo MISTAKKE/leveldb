@@ -100,6 +100,8 @@ class LEVELDB_EXPORT Status {
   const char* state_;
 };
 
+//1 inline https://www.runoob.com/w3cnote/cpp-inline-usage.html
+//实现层面使用，减少栈消耗
 inline Status::Status(const Status& rhs) {
   state_ = (rhs.state_ == nullptr) ? nullptr : CopyState(rhs.state_);
 }
@@ -112,6 +114,14 @@ inline Status& Status::operator=(const Status& rhs) {
   }
   return *this;
 }
+
+//1 what's the different between above?  https://juejin.cn/post/6844903497075294216
+//右值引用
+//2 swap
+//把自身的数据交给右值引用，作为废弃
+//3 noexcept 
+//noexcept表明函数或操作不会发生异常，会给编译器更大的优化空间
+
 inline Status& Status::operator=(Status&& rhs) noexcept {
   std::swap(state_, rhs.state_);
   return *this;
