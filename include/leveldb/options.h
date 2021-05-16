@@ -12,7 +12,7 @@
 namespace leveldb {
 
 class Cache;
-class Comparator;
+class Comparator;//?
 class Env;
 class FilterPolicy;
 class Logger;
