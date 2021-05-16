@@ -217,13 +217,14 @@ class LRUCache {
   //标识成员函数即使的const修饰时，其成员变量也可以被修改
   size_t usage_ GUARDED_BY(mutex_);
   //GUARDED_BY 标识在使用变量时，必须access到 mutex_
+  //usage_ 标识其所有node的 charge之和
 
   // Dummy head of LRU list.
   // lru.prev is newest entry, lru.next is oldest entry.
   // Entries have refs==1 and in_cache==true.
   LRUHandle lru_ GUARDED_BY(mutex_);
   /*
-    lru_ 是一个带头节点的待删除链表
+    lru_ 是一个带头节点的双向链表
     lru_ 里面都是不在cache且等着被淘汰的节点
     lru_.next是最老的准备被淘汰的节点
     lru_后续有节点 iff lru_.next != &lru_
@@ -255,9 +256,9 @@ class LRUCache {
 
 LRUCache::LRUCache() : capacity_(0), usage_(0) {
   // Make empty circular linked lists.
-  lru_.next = &lru_;
+  lru_.next = &lru_;//init as empty
   lru_.prev = &lru_;
-  in_use_.next = &in_use_;
+  in_use_.next = &in_use_;//init as empty
   in_use_.prev = &in_use_;
 }
 
@@ -291,13 +292,15 @@ void LRUCache::Unref(LRUHandle* e) {
   case3: 在 in_cache_里面 不用降到 lru_
 
   */
-  //refs==0 iff 该节点在 lru_中 i该节点需要被删除了(断言不在cache中 且需要调deleter函数 且要回收空间)
+  
   if (e->refs == 0) {  // Deallocate.
+    //[case1] iff [refs==0, 该节点在 lru_中, i该节点需要被删除了, 在cache中]
     assert(!e->in_cache);
     //删除的步骤 1)调 deleter函数 2)回收空间
     (*e->deleter)(e->key(), e->value);
     free(e);
   } else if (e->in_cache && e->refs == 1) {
+    //[case2] iff [refs==1, 节点在 in_cache中]
     // No longer in use; move to lru_ list.
     LRU_Remove(e);
     LRU_Append(&lru_, e);
@@ -364,6 +367,7 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
     // don't cache. (capacity_==0 is supported and turns off caching.)
     // next is read by key() in an assert, so it must be initialized
     e->next = nullptr;
+    //next 和 prev 用于维护双链表性质
   }
   //因为加入了一个节点，需要保证 capacity_不超标  lru_.next != &lru_ iff lru_里面有节点 lru_.next 不为空
   while (usage_ > capacity_ && lru_.next != &lru_) {
@@ -415,20 +419,28 @@ void LRUCache::Prune() {
 static const int kNumShardBits = 4;
 static const int kNumShards = 1 << kNumShardBits;
 
+/*
+  1 控制key的hash算法
+  2 通过分散到多组的方式 来增大整体的并发(减少锁的冲突)
+  3 锁是用来控制 last_id_ 和 NewId的调用的
+*/
 class ShardedLRUCache : public Cache {
  private:
   LRUCache shard_[kNumShards];
   port::Mutex id_mutex_;
   uint64_t last_id_;
 
+  //返回 string 到 u32 的哈希映射
   static inline uint32_t HashSlice(const Slice& s) {
     return Hash(s.data(), s.size(), 0);
   }
 
+  //具体到哪个组
   static uint32_t Shard(uint32_t hash) { return hash >> (32 - kNumShardBits); }
 
  public:
   explicit ShardedLRUCache(size_t capacity) : last_id_(0) {
+    //向上取整
     const size_t per_shard = (capacity + (kNumShards - 1)) / kNumShards;
     for (int s = 0; s < kNumShards; s++) {
       shard_[s].SetCapacity(per_shard);

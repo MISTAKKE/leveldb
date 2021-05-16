@@ -12,6 +12,7 @@
 
 namespace leveldb {
 
+//自己实现的Hash函数 通过长度为n的字符串完成到 32的映射
 uint32_t Hash(const char* data, size_t n, uint32_t seed);
 
 }  // namespace leveldb
