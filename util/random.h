@@ -55,6 +55,12 @@ class Random {
   // Skewed: pick "base" uniformly from range [0,max_log] and then
   // return "base" random bits.  The effect is to pick a number in the
   // range [0,2^max_log-1] with exponential bias towards smaller numbers.
+  /*
+    max_log ==3; 
+    x = Uniform(max_log + 1);  x->[0, 3]; 均匀分布
+    y = (1<<x); y->[1, 8]
+    z = Uniform(y); z->[0, 7]
+  */
   uint32_t Skewed(int max_log) { return Uniform(1 << Uniform(max_log + 1)); }
 };
 

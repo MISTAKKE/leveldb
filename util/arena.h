@@ -24,6 +24,10 @@ class Arena {
 
   // Return a pointer to a newly allocated memory block of "bytes" bytes.
   char* Allocate(size_t bytes);
+  /*两个对外接口：
+    1 申请空间
+    2 申请内存对齐的空间
+  */
 
   // Allocate memory with the normal alignment guarantees provided by malloc.
   char* AllocateAligned(size_t bytes);
@@ -35,8 +39,8 @@ class Arena {
   }
 
  private:
-  char* AllocateFallback(size_t bytes);
-  char* AllocateNewBlock(size_t block_bytes);
+  char* AllocateFallback(size_t bytes);//新申请空间，并管理
+  char* AllocateNewBlock(size_t block_bytes);//申请空间
 
   // Allocation state
   char* alloc_ptr_;
@@ -52,6 +56,10 @@ class Arena {
   std::atomic<size_t> memory_usage_;
 };
 
+/*
+  1 从当前剩余空间取
+  2 新申请空间取
+*/
 inline char* Arena::Allocate(size_t bytes) {
   // The semantics of what to return are a bit messy if we allow
   // 0-byte allocations, so we disallow them here (we don't need
