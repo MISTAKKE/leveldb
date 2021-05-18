@@ -129,6 +129,7 @@ struct LEVELDB_EXPORT Options {
   // worth switching to kNoCompression.  Even if the input data is
   // incompressible, the kSnappyCompression implementation will
   // efficiently detect that and will switch to uncompressed mode.
+  //压缩算法很棒，与持久化的技术快多了；如果数据已经被压缩，那么我会识别出来
   CompressionType compression = kSnappyCompression;
 
   // EXPERIMENTAL: If true, append to existing MANIFEST and log files

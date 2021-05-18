@@ -43,6 +43,7 @@ BlockBuilder::BlockBuilder(const Options* options)
   restarts_.push_back(0);  // First restart point is at offset 0
 }
 
+//初始化对象
 void BlockBuilder::Reset() {
   buffer_.clear();
   restarts_.clear();
@@ -66,12 +67,21 @@ Slice BlockBuilder::Finish() {
   PutFixed32(&buffer_, restarts_.size());
   finished_ = true;
   return Slice(buffer_);
+  /*
+  |data-1|data-2|data-n|idx-1|idx-2|idx-n| n |
+  解析时从后向前
+  */
 }
 
+/*
+restarts_ track了多个分区的起始地址
+每个分区里面的key长度为 options_->block_restart_interval=16(default)
+*/
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
   Slice last_key_piece(last_key_);
   assert(!finished_);
   assert(counter_ <= options_->block_restart_interval);
+  //if buffer_ not empty, input key must > lastkey_
   assert(buffer_.empty()  // No values yet?
          || options_->comparator->Compare(key, last_key_piece) > 0);
   size_t shared = 0;
@@ -98,10 +108,14 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
   buffer_.append(value.data(), value.size());
 
   // Update state
-  last_key_.resize(shared);
+  last_key_.resize(shared);//std::string::resize 丢弃后续的长度
   last_key_.append(key.data() + shared, non_shared);
   assert(Slice(last_key_) == key);
   counter_++;
+  /*
+  | 4(B)-shared | 4(B)-non_shared | 4(B)-value_size | non_shared(B) delta-key | value_size(B) value |
+    benefit bytes = shared - 4(unsigned int)
+  */
 }
 
 }  // namespace leveldb

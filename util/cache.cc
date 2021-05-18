@@ -43,15 +43,15 @@ namespace {
 struct LRUHandle {
   void* value;
   void (*deleter)(const Slice&, void* value);
-  LRUHandle* next_hash;//bucket中的next node
+  LRUHandle* next_hash;//bucket 中的next node
   LRUHandle* next;;//LRU链表双向指针
   LRUHandle* prev;;//LRU链表双向指针
   size_t charge;  // TODO(opt): Only allow uint32_t? //用于计算该节点的容量
-  size_t key_length;
+  size_t key_length; //key的长度
   bool in_cache;     // Whether entry is in the cache.
   uint32_t refs;     // References, including cache reference, if present.
   uint32_t hash;     // Hash of key(); used for fast sharding and comparisons
-  char key_data[1];  // Beginning of key  占位符????
+  char key_data[1];  // Beginning of key  占位符
 
   Slice key() const {
     // next_ is only equal to this if the LRU handle is the list head of an
@@ -294,7 +294,7 @@ void LRUCache::Unref(LRUHandle* e) {
   */
   
   if (e->refs == 0) {  // Deallocate.
-    //[case1] iff [refs==0, 该节点在 lru_中, i该节点需要被删除了, 在cache中]
+    //[case1] iff [refs==0, 该节点在 lru_中, i该节点需要被删除了, 不在cache中]
     assert(!e->in_cache);
     //删除的步骤 1)调 deleter函数 2)回收空间
     (*e->deleter)(e->key(), e->value);
