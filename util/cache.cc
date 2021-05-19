@@ -143,8 +143,6 @@ class HandleTable {
     while (*ptr != nullptr && ((*ptr)->hash != hash || key != (*ptr)->key())) {
       ptr = &(*ptr)->next_hash;
     }
-    //退出情况
-    //1 ptr为空
     return ptr;
   }
 
