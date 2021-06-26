@@ -36,12 +36,14 @@ class DBImpl : public DB {
   ~DBImpl() override;
 
   // Implementations of the DB interface
+  //put get delete 都是调Write，Write支持批量操作
   Status Put(const WriteOptions&, const Slice& key,
              const Slice& value) override;
   Status Delete(const WriteOptions&, const Slice& key) override;
   Status Write(const WriteOptions& options, WriteBatch* updates) override;
   Status Get(const ReadOptions& options, const Slice& key,
              std::string* value) override;
+  
   Iterator* NewIterator(const ReadOptions&) override;
   const Snapshot* GetSnapshot() override;
   void ReleaseSnapshot(const Snapshot* snapshot) override;

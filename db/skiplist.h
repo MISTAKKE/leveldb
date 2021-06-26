@@ -335,6 +335,7 @@ SkipList<Key, Comparator>::SkipList(Comparator cmp, Arena* arena)
 
 template <typename Key, class Comparator>
 void SkipList<Key, Comparator>::Insert(const Key& key) {
+  //对于SkipList的插入操作
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
   // here since Insert() is externally synchronized.
   Node* prev[kMaxHeight];

@@ -725,7 +725,6 @@ void DBImpl::BackgroundCompaction() {
   } else {
     c = versions_->PickCompaction();
   }
-
   Status status;
   if (c == nullptr) {
     // Nothing to do
@@ -1188,15 +1187,18 @@ void DBImpl::ReleaseSnapshot(const Snapshot* snapshot) {
   snapshots_.Delete(static_cast<const SnapshotImpl*>(snapshot));
 }
 
+// DBImpl::Put()  ->  DBImpl::Write
 // Convenience methods
 Status DBImpl::Put(const WriteOptions& o, const Slice& key, const Slice& val) {
   return DB::Put(o, key, val);
 }
 
+// DBImpl::Delete()  ->  DBImpl::Write
 Status DBImpl::Delete(const WriteOptions& options, const Slice& key) {
   return DB::Delete(options, key);
 }
 
+//updates是一次写入的增量
 Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   Writer w(&mutex_);
   w.batch = updates;
@@ -1208,18 +1210,30 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   while (!w.done && &w != writers_.front()) {
     w.cv.Wait();
   }
+  /*
+    一直等待到这次写完成或者这次写被放在队列的最前面，BuildBatchGroup会将队列  
+   里所有sync设置相同的写请求组成一个WriteBatch进行写入，这里的写请求有可能在
+   别的线程完成写操作了
+    是否在队列首的判断是有可能此刻没有其他线程在写循环中，
+   或者本次写请求和前面的写请求的同步设置不一致，那么这种情况就需要自己进入该线
+   程完成写的操作。
+    只有第一个线程会执行写操作，其他的线程不执行写操作，减少磁盘寻址
+  */
   if (w.done) {
     return w.status;
   }
 
+  //here:
+  //w.done == false   and  w is writers_.front()
+
   // May temporarily unlock and wait.
-  Status status = MakeRoomForWrite(updates == nullptr);
-  uint64_t last_sequence = versions_->LastSequence();
+  Status status = MakeRoomForWrite(updates == nullptr);//make level0
+  uint64_t last_sequence = versions_->LastSequence();//last_sequence标识之前的keyvalue.rep_最后一个字节偏移量
   Writer* last_writer = &w;
   if (status.ok() && updates != nullptr) {  // nullptr batch is for compactions
-    WriteBatch* write_batch = BuildBatchGroup(&last_writer);
-    WriteBatchInternal::SetSequence(write_batch, last_sequence + 1);
-    last_sequence += WriteBatchInternal::Count(write_batch);
+    WriteBatch* write_batch = BuildBatchGroup(&last_writer);//write_batch是result，包括dequeue中多个节点
+    WriteBatchInternal::SetSequence(write_batch, last_sequence + 1);//设置新的result起始偏移量
+    last_sequence += WriteBatchInternal::Count(write_batch);//更新当前偏移量
 
     // Add to log and apply to memtable.  We can release the lock
     // during this phase since &w is currently responsible for logging
@@ -1227,6 +1241,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     // into mem_.
     {
       mutex_.Unlock();
+      // 1. 写入log 根据同步设置判断是否同步到磁盘
       status = log_->AddRecord(WriteBatchInternal::Contents(write_batch));
       bool sync_error = false;
       if (status.ok() && options.sync) {
@@ -1235,6 +1250,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
           sync_error = true;
         }
       }
+      // 2. 写入mem 
       if (status.ok()) {
         status = WriteBatchInternal::InsertInto(write_batch, mem_);
       }
@@ -1246,12 +1262,15 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
         RecordBackgroundError(status);
       }
     }
+    // 删除在BuildBatch里面设置的临时Batch的内容 
+    //如果write_batch==tmp_batch_ -> result==tmp_batch_ -> 刚才包含多个节点
     if (write_batch == tmp_batch_) tmp_batch_->Clear();
 
     versions_->SetLastSequence(last_sequence);
   }
 
   while (true) {
+    // 唤醒所有等待写入的线程，将他们置为成功，可退出
     Writer* ready = writers_.front();
     writers_.pop_front();
     if (ready != &w) {
@@ -1259,10 +1278,13 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
       ready->done = true;
       ready->cv.Signal();
     }
+    //last_writer是刚才loop时，track到的最后一个write_batch
     if (ready == last_writer) break;
   }
 
   // Notify new head of write queue
+  //不是把队列所有的任务都处理完，而是把连续sync的batch都处理完
+  //如果后面还有，那就notify it
   if (!writers_.empty()) {
     writers_.front()->cv.Signal();
   }
@@ -1274,9 +1296,9 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
 // REQUIRES: First writer must have a non-null batch
 WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   mutex_.AssertHeld();
-  assert(!writers_.empty());
+  assert(!writers_.empty());//dequeue非空
   Writer* first = writers_.front();
-  WriteBatch* result = first->batch;
+  WriteBatch* result = first->batch;//第一个的updates，其rep_就是第一个值的内容
   assert(result != nullptr);
 
   size_t size = WriteBatchInternal::ByteSize(first->batch);
@@ -1284,21 +1306,26 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   // Allow the group to grow up to a maximum size, but if the
   // original write is small, limit the growth so we do not slow
   // down the small write too much.
+  //如果都是小keyvalue对的话，将此次的新增不累积，避免过多的compaction
   size_t max_size = 1 << 20;
   if (size <= (128 << 10)) {
     max_size = size + (128 << 10);
   }
 
-  *last_writer = first;
+  *last_writer = first;//将最后一个节点init as 第一个节点，以防止没有第二个节点
   std::deque<Writer*>::iterator iter = writers_.begin();
   ++iter;  // Advance past "first"
   for (; iter != writers_.end(); ++iter) {
+    //第一次循环是第二个节点
     Writer* w = *iter;
     if (w->sync && !first->sync) {
       // Do not include a sync write into a batch handled by a non-sync write.
+      //下一条与上一条的sync状态相同时，才可以一起写入，否则就在deque中等待下次写入
       break;
     }
 
+    //当第二个节点存在时，将一连串的batch贴在tmp_batch_.rep_作为 result返回
+    //当第二个节点不存在时，将第一个batch作为 result返回
     if (w->batch != nullptr) {
       size += WriteBatchInternal::ByteSize(w->batch);
       if (size > max_size) {
@@ -1307,12 +1334,15 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
       }
 
       // Append to *result
+      //将第一个节点加入
       if (result == first->batch) {
         // Switch to temporary batch instead of disturbing caller's batch
+        //tmp_batch_ is inited as clean
         result = tmp_batch_;
         assert(WriteBatchInternal::Count(result) == 0);
         WriteBatchInternal::Append(result, first->batch);
       }
+      //将第二到n个节点加入
       WriteBatchInternal::Append(result, w->batch);
     }
     *last_writer = w;
@@ -1466,9 +1496,9 @@ void DBImpl::GetApproximateSizes(const Range* range, int n, uint64_t* sizes) {
 
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
-Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
+Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {//DB::Put
   WriteBatch batch;
-  batch.Put(key, value);
+  batch.Put(key, value);//创建一个局部变量 batch，将key value写入
   return Write(opt, &batch);
 }
 
