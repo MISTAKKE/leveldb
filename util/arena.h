@@ -13,7 +13,7 @@
 
 namespace leveldb {
 
-class Arena {
+class –Arena {
  public:
   Arena();
 

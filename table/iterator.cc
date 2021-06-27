@@ -7,14 +7,17 @@
 namespace leveldb {
 
 Iterator::Iterator() {
+  //初始化把清理函数和next指针置为空
   cleanup_head_.function = nullptr;
   cleanup_head_.next = nullptr;
 }
 
 Iterator::~Iterator() {
   if (!cleanup_head_.IsEmpty()) {
+    //调用头结点的清理函数
     cleanup_head_.Run();
     for (CleanupNode* node = cleanup_head_.next; node != nullptr;) {
+      //调用非头节点的清理函数，one by one
       node->Run();
       CleanupNode* next_node = node->next;
       delete node;
@@ -26,13 +29,16 @@ Iterator::~Iterator() {
 void Iterator::RegisterCleanup(CleanupFunction func, void* arg1, void* arg2) {
   assert(func != nullptr);
   CleanupNode* node;
+  //第一次调用时，头结点是空的，对头节点的三元组赋值
   if (cleanup_head_.IsEmpty()) {
     node = &cleanup_head_;
   } else {
+    //非第一次调用时，new一个新节点，并且将新节点插入为[第二个节点]
     node = new CleanupNode();
     node->next = cleanup_head_.next;
     cleanup_head_.next = node;
   }
+  
   node->function = func;
   node->arg1 = arg1;
   node->arg2 = arg2;

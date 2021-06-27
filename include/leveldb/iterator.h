@@ -84,9 +84,9 @@ class LEVELDB_EXPORT Iterator {
   // Cleanup functions are stored in a single-linked list.
   // The list's head node is inlined in the iterator.
   struct CleanupNode {
-    // True if the node is not used. Only head nodes might be unused.
+    // True if the node is not used. Only head nodes might be unused. 只有头节点可能是空的
     bool IsEmpty() const { return function == nullptr; }
-    // Invokes the cleanup function.
+    // Invokes the cleanup function. 调用清理函数
     void Run() {
       assert(function != nullptr);
       (*function)(arg1, arg2);
@@ -98,7 +98,13 @@ class LEVELDB_EXPORT Iterator {
     void* arg2;
     CleanupNode* next;
   };
+  //唯一的成员变量是一个struct，有四个参数，3个是清理函数的组合，1个是next指针
   CleanupNode cleanup_head_;
+  
+  /*在调用的时候
+    1. 重写接口RegisterCleanup
+    2. RegisterCleanup里面让 cleanup_head_.Run()
+  */
 };
 
 // Return an empty iterator (yields nothing).

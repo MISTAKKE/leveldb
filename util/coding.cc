@@ -18,13 +18,14 @@ void PutFixed64(std::string* dst, uint64_t value) {
   dst->append(buf, sizeof(buf));
 }
 
+//每一个字节放的都是int8，而非uint8
 char* EncodeVarint32(char* dst, uint32_t v) {
   // Operate on characters as unsigneds
   uint8_t* ptr = reinterpret_cast<uint8_t*>(dst);
-  static const int B = 128;
+  static const int B = 128;//128 == 1<<7
   if (v < (1 << 7)) {
     *(ptr++) = v;
-  } else if (v < (1 << 14)) {
+  } else if (v < (1 << 14)) {  // iff v==1<<14-1  100000000000000=1<<14  111111 1111111=1<<14-1  
     *(ptr++) = v | B;
     *(ptr++) = v >> 7;
   } else if (v < (1 << 21)) {
@@ -74,6 +75,7 @@ void PutLengthPrefixedSlice(std::string* dst, const Slice& value) {
   dst->append(value.data(), value.size());
 }
 
+//每一个字节放的都是int8，而非uint8，算一个uint32_t有几个字节
 int VarintLength(uint64_t v) {
   int len = 1;
   while (v >= 128) {

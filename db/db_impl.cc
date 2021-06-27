@@ -1301,11 +1301,12 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   WriteBatch* result = first->batch;//第一个的updates，其rep_就是第一个值的内容
   assert(result != nullptr);
 
-  size_t size = WriteBatchInternal::ByteSize(first->batch);
+  size_t size = WriteBatchInternal::ByteSize(first->batch);//第一个节点的大小
 
   // Allow the group to grow up to a maximum size, but if the
   // original write is small, limit the growth so we do not slow
   // down the small write too much.
+  //max_size保证当前的memtable不会太大，如果很大的话，就不把队列里面的节点拿出来了
   //如果都是小keyvalue对的话，将此次的新增不累积，避免过多的compaction
   size_t max_size = 1 << 20;
   if (size <= (128 << 10)) {
@@ -1315,8 +1316,8 @@ WriteBatch* DBImpl::BuildBatchGroup(Writer** last_writer) {
   *last_writer = first;//将最后一个节点init as 第一个节点，以防止没有第二个节点
   std::deque<Writer*>::iterator iter = writers_.begin();
   ++iter;  // Advance past "first"
+  //以第二个节点开始循环
   for (; iter != writers_.end(); ++iter) {
-    //第一次循环是第二个节点
     Writer* w = *iter;
     if (w->sync && !first->sync) {
       // Do not include a sync write into a batch handled by a non-sync write.
