@@ -33,17 +33,18 @@ Writer::~Writer() = default;
 
 Status Writer::AddRecord(const Slice& slice) {
   const char* ptr = slice.data();
-  size_t left = slice.size();
+  size_t left = slice.size();//初始化为需要写的空间；标记之前的轮次结束后，还需要些的空间
 
   // Fragment the record if necessary and emit it.  Note that if slice
   // is empty, we still want to iterate once to emit a single
   // zero-length record
   Status s;
-  bool begin = true;
+  bool begin = true;//begin标识这是一次开始
   do {
     const int leftover = kBlockSize - block_offset_;
     assert(leftover >= 0);
     if (leftover < kHeaderSize) {
+      //如果剩下的空间不足以写一个header，那就填充0
       // Switch to a new block
       if (leftover > 0) {
         // Fill the trailer (literal below relies on kHeaderSize being 7)
@@ -54,13 +55,14 @@ Status Writer::AddRecord(const Slice& slice) {
     }
 
     // Invariant: we never leave < kHeaderSize bytes in a block.
+    //保证: 一定能写下一个header
     assert(kBlockSize - block_offset_ - kHeaderSize >= 0);
 
-    const size_t avail = kBlockSize - block_offset_ - kHeaderSize;
-    const size_t fragment_length = (left < avail) ? left : avail;
+    const size_t avail = kBlockSize - block_offset_ - kHeaderSize;//可写的空间
+    const size_t fragment_length = (left < avail) ? left : avail;//此次准备写入的空间
 
     RecordType type;
-    const bool end = (left == fragment_length);
+    const bool end = (left == fragment_length);//「需要写的空间」==「此次准备写入的空间」iff 此次将写完所有数据，end标识这是最后一次写入
     if (begin && end) {
       type = kFullType;
     } else if (begin) {
@@ -71,7 +73,7 @@ Status Writer::AddRecord(const Slice& slice) {
       type = kMiddleType;
     }
 
-    s = EmitPhysicalRecord(type, ptr, fragment_length);
+    s = EmitPhysicalRecord(type, ptr, fragment_length);//写入的类型，外部数据指针，此次写入的长度
     ptr += fragment_length;
     left -= fragment_length;
     begin = false;

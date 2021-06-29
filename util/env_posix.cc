@@ -448,10 +448,12 @@ int LockOrUnlock(int fd, bool lock) {
 }
 
 // Instances are thread-safe because they are immutable.
+// 常量=线程安全
 class PosixFileLock : public FileLock {
  public:
   PosixFileLock(int fd, std::string filename)
       : fd_(fd), filename_(std::move(filename)) {}
+  //使用std::move，将形参的数据移动到常量，避免额外创建一次std::string对象
 
   int fd() const { return fd_; }
   const std::string& filename() const { return filename_; }
