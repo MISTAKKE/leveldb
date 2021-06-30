@@ -98,11 +98,11 @@ Status Writer::EmitPhysicalRecord(RecordType t, const char* ptr,
   EncodeFixed32(buf, crc);
 
   // Write the header and the payload
-  Status s = dest_->Append(Slice(buf, kHeaderSize));
+  Status s = dest_->Append(Slice(buf, kHeaderSize));//1 写header部分
   if (s.ok()) {
-    s = dest_->Append(Slice(ptr, length));
+    s = dest_->Append(Slice(ptr, length));//2 写data部分
     if (s.ok()) {
-      s = dest_->Flush();
+      s = dest_->Flush();//3 刷盘
     }
   }
   block_offset_ += kHeaderSize + length;

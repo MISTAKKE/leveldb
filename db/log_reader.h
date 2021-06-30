@@ -54,6 +54,10 @@ class Reader {
   // will only be valid until the next mutating operation on this
   // reader or the next mutation to *scratch.
   bool ReadRecord(Slice* record, std::string* scratch);
+  //写的时候，只有一个参数 record，那就是用户的数据能写进去即可
+  //读的时候，这里为什么要有 scratch呢？因为leveldb在读的时候，
+  //  可能读到了多个block，这里将循环多次读，所以这里用于放中间数据
+  // 那么为什么需要外部传入空间存放中间数据，而不用自己new出来的空间，或者是用record的空间呢? 未知
 
   // Returns the physical offset of the last record returned by ReadRecord.
   //

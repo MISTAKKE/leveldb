@@ -39,7 +39,7 @@ bool Reader::SkipToInitialBlock() {
     block_start_location += kBlockSize;
   }
 
-  end_of_buffer_offset_ = block_start_location;
+   block_start_location;
 
   // Skip to start of first block that can contain the initial record
   if (block_start_location > 0) {
@@ -62,11 +62,11 @@ bool Reader::ReadRecord(Slice* record, std::string* scratch) {
 
   scratch->clear();
   record->clear();
-  bool in_fragmented_record = false;
+  bool in_fragmented_record = false;//"读取中"的状态标识
   // Record offset of the logical record that we're reading
   // 0 is a dummy value to make compilers happy
-  uint64_t prospective_record_offset = 0;
-
+  uint64_t prospective_record_offset = 0;//需要每次都记录读取的末尾位置，用来更新当前reader的末尾 last_record_offset_
+  //https://zhuanlan.zhihu.com/p/44150093
   Slice fragment;
   while (true) {
     const unsigned int record_type = ReadPhysicalRecord(&fragment);
@@ -186,13 +186,14 @@ void Reader::ReportDrop(uint64_t bytes, const Status& reason) {
   }
 }
 
+//正常情况: 返回type，data
 unsigned int Reader::ReadPhysicalRecord(Slice* result) {
   while (true) {
     if (buffer_.size() < kHeaderSize) {
       if (!eof_) {
         // Last read was a full read, so this is a trailer to skip
         buffer_.clear();
-        Status status = file_->Read(kBlockSize, &buffer_, backing_store_);
+        Status status = file_->Read(kBlockSize, &buffer_, backing_store_);//把一个block大小的数据放在buffer_里面
         end_of_buffer_offset_ += buffer_.size();
         if (!status.ok()) {
           buffer_.clear();
@@ -243,7 +244,7 @@ unsigned int Reader::ReadPhysicalRecord(Slice* result) {
     // Check crc
     if (checksum_) {
       uint32_t expected_crc = crc32c::Unmask(DecodeFixed32(header));
-      uint32_t actual_crc = crc32c::Value(header + 6, 1 + length);
+      uint32_t actual_crc = crc32c::Value(header + 6, 1 + length);//计算crc的时候，将长度和数据一起计算
       if (actual_crc != expected_crc) {
         // Drop the rest of the buffer since "length" itself may have
         // been corrupted and if we trust it, we could find some
