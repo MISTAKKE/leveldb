@@ -47,9 +47,11 @@ class LEVELDB_EXPORT WriteBatch {
 
   ~WriteBatch();
 
+  //初始化数据
   // Store the mapping "key->value" in the database.
   void Put(const Slice& key, const Slice& value);
 
+  //初始化数据
   // If the database contains a mapping for "key", erase it.  Else do nothing.
   void Delete(const Slice& key);
 
@@ -67,7 +69,7 @@ class LEVELDB_EXPORT WriteBatch {
   // This runs in O(source size) time. However, the constant factor is better
   // than calling Iterate() over the source batch with a Handler that replicates
   // the operations into this batch.
-  void Append(const WriteBatch& source);
+  void Append(const WriteBatch& source);//修改头部后追加写
 
   // Support for iterating over the contents of a batch.
   Status Iterate(Handler* handler) const;

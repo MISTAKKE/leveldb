@@ -15,12 +15,12 @@ namespace leveldb {
 static uint64_t PackSequenceAndType(uint64_t seq, ValueType t) {
   assert(seq <= kMaxSequenceNumber);
   assert(t <= kValueTypeForSeek);
-  return (seq << 8) | t;
+  return (seq << 8) | t;//低8位保存type
 }
 
 void AppendInternalKey(std::string* result, const ParsedInternalKey& key) {
-  result->append(key.user_key.data(), key.user_key.size());
-  PutFixed64(result, PackSequenceAndType(key.sequence, key.type));
+  result->append(key.user_key.data(), key.user_key.size());//把key写进去
+  PutFixed64(result, PackSequenceAndType(key.sequence, key.type));//seq向左移8位后，低8位保存类型，然后添加到key后面
 }
 
 std::string ParsedInternalKey::DebugString() const {

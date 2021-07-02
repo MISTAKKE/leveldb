@@ -9,7 +9,7 @@
 
 namespace leveldb {
 
-static std::string IKey(const std::string& user_key, uint64_t seq,
+static std::string IKey(const std::string& user_key, uint64_t seq,//先放key，再放seq(7字节)，再放类型(1字节)
                         ValueType vt) {
   std::string encoded;
   AppendInternalKey(&encoded, ParsedInternalKey(user_key, seq, vt));

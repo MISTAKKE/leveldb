@@ -73,6 +73,13 @@ class MemTableIterator : public Iterator {
 
 Iterator* MemTable::NewIterator() { return new MemTableIterator(&table_); }
 
+// |klength|user_key       | seq  |type|vlength    |value      |
+// |klength|user_key       |type(tag)  |vlength    |value      |
+// |4 Byte |klength-8 Byte |8 Byte     |4 Byte     |vlenth Byte|
+//         |<---user key-->|
+//         |<------internal key------->|
+// |<----------memtable key----------->|<-----value----------->|
+// https://blog.csdn.net/doc_sgl/article/details/52824656
 void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
                    const Slice& value) {
   // Format of an entry is concatenation of:
@@ -87,7 +94,7 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
                              internal_key_size + VarintLength(val_size) +
                              val_size;
   char* buf = arena_.Allocate(encoded_len);//0 新申请一片空间
-  char* p = EncodeVarint32(buf, internal_key_size);//1 放 key_size + type_size
+  char* p = EncodeVarint32(buf, internal_key_size);//1 放key_size + type_size
   std::memcpy(p, key.data(), key_size);//2 放key
   p += key_size;
   EncodeFixed64(p, (s << 8) | type);//3 放value类型(删除/写入) 作为uint64_t写入

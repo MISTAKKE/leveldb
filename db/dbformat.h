@@ -64,7 +64,7 @@ typedef uint64_t SequenceNumber;
 
 // We leave eight bits empty at the bottom so a type and sequence#
 // can be packed together into 64-bits.
-static const SequenceNumber kMaxSequenceNumber = ((0x1ull << 56) - 1);
+static const SequenceNumber kMaxSequenceNumber = ((0x1ull << 56) - 1); //0xFF FF FF FF FF FF FF FF 14个F 7字节
 
 struct ParsedInternalKey {
   Slice user_key;
@@ -115,6 +115,13 @@ class InternalKeyComparator : public Comparator {
 
   int Compare(const InternalKey& a, const InternalKey& b) const;
 };
+// |klength|user_key       | seq  |type|vlength    |value      |
+// |klength|user_key       |type(tag)  |vlength    |value      |
+// |4 Byte |klength-8 Byte |8 Byte     |4 Byte     |vlenth Byte|
+//         |<---user key-->|
+//         |<------internal key------->|
+// |<----------memtable key----------->|<-----value----------->|
+// https://blog.csdn.net/doc_sgl/article/details/52824656
 
 // Filter policy wrapper that converts from internal keys to user keys
 class InternalFilterPolicy : public FilterPolicy {
@@ -168,7 +175,7 @@ inline int InternalKeyComparator::Compare(const InternalKey& a,
   return Compare(a.Encode(), b.Encode());
 }
 
-inline bool ParseInternalKey(const Slice& internal_key,
+inline bool ParseInternalKey(const Slice& internal_key,//从字符串解析成对象
                              ParsedInternalKey* result) {
   const size_t n = internal_key.size();
   if (n < 8) return false;
