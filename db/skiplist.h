@@ -264,15 +264,16 @@ template <typename Key, class Comparator>
 typename SkipList<Key, Comparator>::Node*
 SkipList<Key, Comparator>::FindGreaterOrEqual(const Key& key,
                                               Node** prev) const {
+  //prev的作用：对每一层来说，记录每层 比key小的最大节点x，准备将key放在x后面
   Node* x = head_;
   int level = GetMaxHeight() - 1;
   while (true) {
     Node* next = x->Next(level);
     if (KeyIsAfterNode(key, next)) {
       // Keep searching in this list
-      x = next;
+      x = next;//key的值要比x大
     } else {
-      if (prev != nullptr) prev[level] = x;
+      if (prev != nullptr) prev[level] = x;//x是level层比key小的 最大的节点,key应该放在x后面
       if (level == 0) {
         return next;
       } else {
@@ -341,8 +342,10 @@ void SkipList<Key, Comparator>::Insert(const Key& key) {
   //对于SkipList的插入操作
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
   // here since Insert() is externally synchronized.
-  Node* prev[kMaxHeight];//kMaxHeight:12 长度12的链表
-  Node* x = FindGreaterOrEqual(key, prev);
+  //kMaxHeight:12 长度12的链表
+  Node* prev[kMaxHeight];
+  //prev的作用：对每一层来说，记录每层 比key小的最大节点x，准备将key放在x后面
+  Node* x = FindGreaterOrEqual(key, prev);//返回第0层 比x小的第一个节点
 
   // Our data structure does not allow duplicate insertion
   assert(x == nullptr || !Equal(key, x->key));
@@ -350,7 +353,7 @@ void SkipList<Key, Comparator>::Insert(const Key& key) {
   int height = RandomHeight();
   if (height > GetMaxHeight()) {
     for (int i = GetMaxHeight(); i < height; i++) {
-      prev[i] = head_;
+      prev[i] = head_;//如果此次新节点的层数，比旧层数要高，那么多出来的层数的初始值记为head
     }
     // It is ok to mutate max_height_ without any synchronization
     // with concurrent readers.  A concurrent reader that observes
