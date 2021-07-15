@@ -184,6 +184,7 @@ typename SkipList<Key, Comparator>::Node* SkipList<Key, Comparator>::NewNode(
     const Key& key, int height) {
   char* const node_memory = arena_->AllocateAligned(
       sizeof(Node) + sizeof(std::atomic<Node*>) * (height - 1));
+  //层数越高，空间越多
   return new (node_memory) Node(key);
 }
 
@@ -247,6 +248,7 @@ int SkipList<Key, Comparator>::RandomHeight() {
   while (height < kMaxHeight && ((rnd_.Next() % kBranching) == 0)) {
     height++;
   }
+  //有1/k的概率自增，指数分布
   assert(height > 0);
   assert(height <= kMaxHeight);
   return height;
